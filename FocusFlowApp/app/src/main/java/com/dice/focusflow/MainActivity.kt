@@ -29,22 +29,25 @@ class MainActivity : ComponentActivity() {
 fun FocusFlowApp() {
     val navController = rememberNavController()
 
-    Scaffold(
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text("FocusFlow") }
+    com.dice.focusflow.ui.theme.FocusFlowTheme {
+        Scaffold(
+            topBar = {
+                CenterAlignedTopAppBar(
+                    title = { Text("FocusFlow") }
+                )
+            },
+            bottomBar = {
+                BottomBar(navController = navController)
+            }
+        ) { innerPadding ->
+            AppNavGraph(
+                navController = navController,
+                modifier = Modifier.padding(innerPadding)
             )
-        },
-        bottomBar = {
-            BottomBar(navController = navController)
         }
-    ) { innerPadding ->
-        AppNavGraph(
-            navController = navController,
-            modifier = Modifier.padding(innerPadding)
-        )
     }
 }
+
 
 @Preview(showBackground = true)
 @Composable
