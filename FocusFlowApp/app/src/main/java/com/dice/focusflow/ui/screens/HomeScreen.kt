@@ -1,120 +1,100 @@
 package com.dice.focusflow.ui.screens
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.ElevatedButton
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.dice.focusflow.feature.pomodoro.PomodoroConfig
 import com.dice.focusflow.feature.pomodoro.PomodoroPhase
 import com.dice.focusflow.feature.pomodoro.PomodoroViewModel
 
 @Composable
 fun HomeScreen(
-    VM: PomodoroViewModel = viewModel()
+    vm: PomodoroViewModel = viewModel()
 ) {
-    val state by VM.state.collectAsState()
-    val progress = VM.progressFraction()
+    val state by vm.state.collectAsStateWithLifecycle()
 
-    Surface(
-        modifier = Modifier.fillMaxSize()
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterVertically),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Column(
+        Text(
+            text = phaseTitle(state.phase),
+            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+        )
+
+        Text(
+            text = formatMMSS(state.remainingSeconds),
+            fontSize = 48.sp,
+            fontWeight = FontWeight.SemiBold
+        )
+
+        LinearProgressIndicator(
+            progress = progressOf(
+                remainingSeconds = state.remainingSeconds,
+                phase = state.phase
+            ),
             modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 24.dp, vertical = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.Top)
+                .fillMaxWidth()
+                .height(10.dp)
+        )
+
+        Button(
+            onClick = { if (state.isRunning) vm.pause() else vm.start() },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
         ) {
-            Text(
-                text = "FocusFlow",
-                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.SemiBold)
-            )
-
-            Text(
-                text = phaseLabel(state.phase),
-                style = MaterialTheme.typography.titleMedium
-            )
-
-            Text(
-                text = formatSeconds(state.remainingSeconds),
-                style = MaterialTheme.typography.displayMedium.copy(fontWeight = FontWeight.Bold)
-            )
-
-            LinearProgressIndicator(
-                progress = { progress },
-                modifier = Modifier
-                    .fillMaxSize(fraction = 0.95f)
-                    .padding(top = 8.dp)
-            )
-
-            Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                if (!state.isRunning) {
-                    Button(onClick = { VM.start() }, contentPadding = PaddingValues(horizontal = 28.dp, vertical = 10.dp)) {
-                        Text("Iniciar")
-                    }
-                } else {
-                    FilledTonalButton(onClick = { VM.pause() }) { Text("Pausar") }
-                }
-
-                ElevatedButton(onClick = { VM.resetToFocus() }) { Text("Resetar p/ Foco") }
-                OutlinedButton(onClick = { VM.skipPhase() }) { Text("Pular fase") }
-            }
-
-            Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text("Presets rápidos", style = MaterialTheme.typography.titleSmall)
-                PresetRow(
-                    onSelect = { cfg -> VM.setConfig(cfg) }
-                )
-            }
-
-            Text(
-                text = "Pomodoros concluídos: ${state.completedPomodoros}",
-                style = MaterialTheme.typography.bodyMedium
-            )
+            Text(if (state.isRunning) "Pausar" else "Iniciar")
         }
+
+        OutlinedButton(
+            onClick = { vm.reset() },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+        ) {
+            Text("Resetar")
+        }
+
+        AssistChip(
+            onClick = { /* no-op */ },
+            label = { Text(if (state.isRunning) "Rodando" else "Pausado") }
+        )
     }
 }
 
-@Composable
-private fun PresetRow(onSelect: (PomodoroConfig) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        OutlinedButton(onClick = { onSelect(PomodoroConfig()) }) { Text("25 / 5 / 15 (x4)") }
-        OutlinedButton(onClick = { onSelect(PomodoroConfig(50, 10, 20, 3)) }) { Text("50 / 10 / 20 (x3)") }
-        OutlinedButton(onClick = { onSelect(PomodoroConfig(15, 3, 8, 4)) }) { Text("15 / 3 / 8 (x4)") }
-    }
+
+private fun phaseTitle(phase: PomodoroPhase): String = when (phase) {
+    PomodoroPhase.Focus -> "Foco"
+    PomodoroPhase.ShortBreak -> "Pausa curta"
+    PomodoroPhase.LongBreak -> "Pausa longa"
 }
 
-private fun phaseLabel(phase: PomodoroPhase): String = when (phase) {
-    PomodoroPhase.FOCUS -> "Foco"
-    PomodoroPhase.SHORT_BREAK -> "Pausa curta"
-    PomodoroPhase.LONG_BREAK -> "Pausa longa"
+
+private fun phaseTotalSeconds(phase: PomodoroPhase): Int = when (phase) {
+    PomodoroPhase.Focus -> 25 * 60
+    PomodoroPhase.ShortBreak -> 5 * 60
+    PomodoroPhase.LongBreak -> 15 * 60
 }
 
-private fun formatSeconds(total: Int): String {
-    val m = total / 60
-    val s = total % 60
-    return "%02d:%02d".format(m, s)
+private fun progressOf(remainingSeconds: Int, phase: PomodoroPhase): Float {
+    val total = phaseTotalSeconds(phase).coerceAtLeast(1)
+    val elapsed = (total - remainingSeconds).coerceIn(0, total)
+    return (elapsed.toFloat() / total).coerceIn(0f, 1f)
+}
+
+private fun formatMMSS(totalSeconds: Int): String {
+    val s = totalSeconds.coerceAtLeast(0)
+    val mm = s / 60
+    val ss = s % 60
+    return "%02d:%02d".format(mm, ss)
 }
