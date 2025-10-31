@@ -5,11 +5,11 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.isActive
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlin.math.max
 
 class PomodoroViewModel(
     private var config: PomodoroConfig = PomodoroConfig()
@@ -17,112 +17,125 @@ class PomodoroViewModel(
 
     private val _state = MutableStateFlow(
         PomodoroState(
-            phase = PomodoroPhase.FOCUS,
-            remainingSeconds = config.totalSecondsFor(PomodoroPhase.FOCUS),
+            phase = PomodoroPhase.Focus,
+            remainingSeconds = config.focusMinutes * 60,
             isRunning = false,
-            completedPomodoros = 0,
-            cycleCount = 0
+            completedPomodoros = 0
         )
     )
     val state: StateFlow<PomodoroState> = _state
 
-    private var tickJob: Job? = null
-
-    fun start() {
-        if (_state.value.isRunning) return
-
-        _state.update { it.copy(isRunning = true) }
-        ensureTicking()
-    }
-
-    fun pause() {
-        _state.update { it.copy(isRunning = false) }
-        cancelTick()
-    }
-
-    fun resume() = start()
-
-    fun resetToFocus() {
-        cancelTick()
-        _state.update {
-            it.copy(
-                phase = PomodoroPhase.FOCUS,
-                remainingSeconds = config.totalSecondsFor(PomodoroPhase.FOCUS),
-                isRunning = false
-            )
+    val progressFraction: StateFlow<Float> = _state.map {
+        val totalSeconds = defaultSecondsFor(it.phase)
+        if (totalSeconds > 0) {
+            1f - (it.remainingSeconds.toFloat() / totalSeconds.toFloat())
+        } else {
+            0f
         }
-    }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = 0f
+    )
 
-    fun skipPhase() {
-
-        transitionToNextPhase(finishedFocus = (_state.value.phase == PomodoroPhase.FOCUS))
-    }
+    private var tickerJob: Job? = null
 
     fun setConfig(newConfig: PomodoroConfig) {
         config = newConfig
-
-        if (!_state.value.isRunning) {
-            _state.update {
-                it.copy(
-                    remainingSeconds = config.totalSecondsFor(it.phase)
-                )
-            }
-        }
+        resetToFocus()
     }
 
-    fun progressFraction(): Float {
-        val total = config.totalSecondsFor(_state.value.phase).toFloat()
-        if (total <= 0f) return 0f
-        return 1f - (_state.value.remainingSeconds / total)
+    fun start() {
+        if (_state.value.isRunning) return
+        _state.value = _state.value.copy(isRunning = true)
+        startTicker()
     }
 
-    private fun ensureTicking() {
-        if (tickJob?.isActive == true) return
-        tickJob = viewModelScope.launch {
-            while (isActive && _state.value.isRunning) {
+    fun pause() {
+        if (!_state.value.isRunning) return
+        _state.value = _state.value.copy(isRunning = false)
+        stopTicker()
+    }
+
+    fun resetToFocus() {
+        stopTicker()
+        _state.value = PomodoroState(
+            phase = PomodoroPhase.Focus,
+            remainingSeconds = config.focusMinutes * 60,
+            isRunning = false,
+            completedPomodoros = 0
+        )
+    }
+
+    fun skipPhase() {
+        stopTicker()
+        advancePhase(skipped = true)
+    }
+
+    private fun startTicker() {
+        stopTicker()
+        tickerJob = viewModelScope.launch {
+            while (_state.value.isRunning) {
                 delay(1000)
-                _state.update { curr ->
-                    val next = max(0, curr.remainingSeconds - 1)
-                    curr.copy(remainingSeconds = next)
-                }
-                if (_state.value.remainingSeconds == 0) {
-                    val finishedFocus = (_state.value.phase == PomodoroPhase.FOCUS)
-                    transitionToNextPhase(finishedFocus)
-                }
+                tick()
             }
         }
     }
 
-    private fun transitionToNextPhase(finishedFocus: Boolean) {
-        _state.update { curr ->
-            if (finishedFocus) {
-                val newCompleted = curr.completedPomodoros + 1
-                val newCycle = curr.cycleCount + 1
-                val nextPhase = if (newCycle % config.longBreakEvery == 0)
-                    PomodoroPhase.LONG_BREAK else PomodoroPhase.SHORT_BREAK
-                curr.copy(
-                    phase = nextPhase,
-                    remainingSeconds = config.totalSecondsFor(nextPhase),
-                    isRunning = true, // segue rodando automaticamente
-                    completedPomodoros = newCompleted,
-                    cycleCount = newCycle
-                )
-            } else {
+    private fun stopTicker() {
+        tickerJob?.cancel()
+        tickerJob = null
+    }
 
-                val nextPhase = PomodoroPhase.FOCUS
-                curr.copy(
+    private fun tick() {
+        val s = _state.value
+        if (!s.isRunning) return
+
+        val next = s.remainingSeconds - 1
+        if (next > 0) {
+            _state.value = s.copy(remainingSeconds = next)
+        } else {
+            advancePhase()
+        }
+    }
+    fun reset() {
+        stopTicker()
+        _state.value = _state.value.copy(
+            phase = PomodoroPhase.Focus,
+            remainingSeconds = defaultSecondsFor(PomodoroPhase.Focus),
+            isRunning = false
+        )
+    }
+    private fun advancePhase(skipped: Boolean = false) {
+        val s = _state.value
+        when (s.phase) {
+            PomodoroPhase.Focus -> {
+                val completed = if (skipped) s.completedPomodoros else s.completedPomodoros + 1
+                val nextPhase =
+                    if (completed % config.cyclesUntilLongBreak == 0) PomodoroPhase.LongBreak
+                    else PomodoroPhase.ShortBreak
+
+                _state.value = s.copy(
                     phase = nextPhase,
-                    remainingSeconds = config.totalSecondsFor(nextPhase),
-                    isRunning = true
+                    remainingSeconds = defaultSecondsFor(nextPhase),
+                    isRunning = false,
+                    completedPomodoros = completed
+                )
+            }
+            PomodoroPhase.ShortBreak, PomodoroPhase.LongBreak -> {
+                _state.value = s.copy(
+                    phase = PomodoroPhase.Focus,
+                    remainingSeconds = defaultSecondsFor(PomodoroPhase.Focus),
+                    isRunning = false
                 )
             }
         }
-
-        ensureTicking()
     }
 
-    private fun cancelTick() {
-        tickJob?.cancel()
-        tickJob = null
+    private fun defaultSecondsFor(phase: PomodoroPhase): Int = when (phase) {
+        PomodoroPhase.Focus -> config.focusMinutes * 60
+        PomodoroPhase.ShortBreak -> config.shortBreakMinutes * 60
+        PomodoroPhase.LongBreak -> config.longBreakMinutes * 60
     }
 }
+
