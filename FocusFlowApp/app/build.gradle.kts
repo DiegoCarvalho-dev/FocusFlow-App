@@ -58,15 +58,16 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.9.2")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
 
-    // Navigation Compose
     implementation("androidx.navigation:navigation-compose:2.8.3")
     implementation("androidx.navigation:navigation-runtime-ktx:2.8.3")
 
-    // Compose UI
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
+
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 
     // Debugging
     debugImplementation("androidx.compose.ui:ui-tooling")
