@@ -1,10 +1,27 @@
 package com.dice.focusflow.ui.screens
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -19,33 +36,79 @@ fun HomeScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
 
+    val progress by animateFloatAsState(
+        targetValue = progressOf(
+            remainingSeconds = state.remainingSeconds,
+            phase = state.phase
+        ),
+        animationSpec = spring(dampingRatio = 0.9f, stiffness = 200f),
+        label = "timerProgress"
+    )
+
+    val phaseColor = when (state.phase) {
+        PomodoroPhase.Focus -> MaterialTheme.colorScheme.primary
+        PomodoroPhase.ShortBreak -> MaterialTheme.colorScheme.tertiary
+        PomodoroPhase.LongBreak -> MaterialTheme.colorScheme.secondary
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterVertically),
+            .padding(horizontal = 24.dp)
+            .padding(top = 24.dp, bottom = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp, Alignment.Top),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
-            text = phaseTitle(state.phase),
-            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
-        )
+        AnimatedContent(
+            targetState = state.phase,
+            transitionSpec = { fadeIn() togetherWith fadeOut() },
+            label = "phaseTitle"
+        ) { phase ->
+            Text(
+                text = phaseTitle(phase),
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+            )
+        }
 
-        Text(
-            text = formatMMSS(state.remainingSeconds),
-            fontSize = 48.sp,
-            fontWeight = FontWeight.SemiBold
-        )
-
-        LinearProgressIndicator(
-            progress = progressOf(
-                remainingSeconds = state.remainingSeconds,
-                phase = state.phase
-            ),
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(10.dp)
+                .padding(top = 8.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(
+                progress = { progress },
+                strokeCap = StrokeCap.Round,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                color = phaseColor,
+                modifier = Modifier.size(220.dp),
+                strokeWidth = 12.dp
+            )
+
+            // Tempo (MM:SS) com transição
+            AnimatedContent(
+                targetState = state.remainingSeconds,
+                transitionSpec = { fadeIn() togetherWith fadeOut() },
+                label = "timeSwap"
+            ) { seconds ->
+                Text(
+                    text = formatMMSS(seconds),
+                    fontSize = 44.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+
+        AssistChip(
+            onClick = { /* no-op */ },
+            label = { Text(phaseTitle(state.phase)) },
+            colors = AssistChipDefaults.assistChipColors(
+                labelColor = MaterialTheme.colorScheme.onPrimary,
+                containerColor = phaseColor
+            )
         )
+
+        Spacer(Modifier.height(12.dp))
 
         Button(
             onClick = { if (state.isRunning) vm.pause() else vm.start() },
@@ -53,11 +116,24 @@ fun HomeScreen(
                 .fillMaxWidth()
                 .height(56.dp)
         ) {
-            Text(if (state.isRunning) "Pausar" else "Iniciar")
+            AnimatedContent(
+                targetState = state.isRunning,
+                transitionSpec = { fadeIn() togetherWith fadeOut() },
+                label = "playPauseText"
+            ) { running ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = if (running) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = null
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (running) "Pausar" else "Iniciar")
+                }
+            }
         }
 
         OutlinedButton(
-            onClick = { vm.reset() },
+            onClick = { vm.resetToFocus() },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp)
@@ -65,6 +141,7 @@ fun HomeScreen(
             Text("Resetar")
         }
 
+        // Status curtinho em texto
         AssistChip(
             onClick = { /* no-op */ },
             label = { Text(if (state.isRunning) "Rodando" else "Pausado") }
@@ -72,13 +149,11 @@ fun HomeScreen(
     }
 }
 
-
 private fun phaseTitle(phase: PomodoroPhase): String = when (phase) {
     PomodoroPhase.Focus -> "Foco"
     PomodoroPhase.ShortBreak -> "Pausa curta"
     PomodoroPhase.LongBreak -> "Pausa longa"
 }
-
 
 private fun phaseTotalSeconds(phase: PomodoroPhase): Int = when (phase) {
     PomodoroPhase.Focus -> 25 * 60
