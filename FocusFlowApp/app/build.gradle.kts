@@ -71,6 +71,8 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.6")
     implementation("androidx.compose.animation:animation")
 
+    implementation("androidx.lifecycle:lifecycle-service:2.8.6")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 
     // Debugging
     debugImplementation("androidx.compose.ui:ui-tooling")
