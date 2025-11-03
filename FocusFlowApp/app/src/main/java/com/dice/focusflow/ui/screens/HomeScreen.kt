@@ -1,5 +1,6 @@
 package com.dice.focusflow.ui.screens
 
+import android.content.Intent
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -22,18 +23,35 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.dice.focusflow.feature.pomodoro.EngineLocator
+import com.dice.focusflow.feature.pomodoro.PomodoroConfig
 import com.dice.focusflow.feature.pomodoro.PomodoroPhase
 import com.dice.focusflow.feature.pomodoro.PomodoroViewModel
+import com.dice.focusflow.feature.pomodoro.PomodoroViewModelFactory
+import com.dice.focusflow.feature.pomodoro.engine.PomodoroEngineImpl
+import com.dice.focusflow.feature.pomodoro.service.PomodoroService
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 
 @Composable
-fun HomeScreen(
-    vm: PomodoroViewModel = viewModel()
-) {
+fun HomeScreen() {
+    val context = LocalContext.current
+    val engine = remember { PomodoroEngineImpl(config = PomodoroConfig(), scope = CoroutineScope(Dispatchers.Default)) }
+
+    LaunchedEffect(engine) {
+        EngineLocator.install(engine)
+    }
+
+    val vm: PomodoroViewModel = viewModel(
+        factory = PomodoroViewModelFactory(engine = engine)
+    )
+
     val state by vm.state.collectAsStateWithLifecycle()
 
     val progress by animateFloatAsState(
@@ -85,7 +103,6 @@ fun HomeScreen(
                 strokeWidth = 12.dp
             )
 
-            // Tempo (MM:SS) com transição
             AnimatedContent(
                 targetState = state.remainingSeconds,
                 transitionSpec = { fadeIn() togetherWith fadeOut() },
@@ -111,7 +128,15 @@ fun HomeScreen(
         Spacer(Modifier.height(12.dp))
 
         Button(
-            onClick = { if (state.isRunning) vm.pause() else vm.start() },
+            onClick = {
+                val intent = Intent(context, PomodoroService::class.java)
+                if (state.isRunning) {
+                    vm.pause()
+                } else {
+                    vm.start()
+                    context.startService(intent)
+                }
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp)
@@ -133,7 +158,10 @@ fun HomeScreen(
         }
 
         OutlinedButton(
-            onClick = { vm.resetToFocus() },
+            onClick = { 
+                vm.resetToFocus()
+                context.stopService(Intent(context, PomodoroService::class.java))
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp)
@@ -141,7 +169,6 @@ fun HomeScreen(
             Text("Resetar")
         }
 
-        // Status curtinho em texto
         AssistChip(
             onClick = { /* no-op */ },
             label = { Text(if (state.isRunning) "Rodando" else "Pausado") }
