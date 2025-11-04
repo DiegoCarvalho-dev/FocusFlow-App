@@ -1,13 +1,13 @@
 package com.dice.focusflow.feature.pomodoro
 
+import com.dice.focusflow.feature.pomodoro.engine.PomodoroEngine
 object EngineLocator {
 
     @Volatile
-    private var _engine: com.dice.focusflow.feature.pomodoro.engine.PomodoroEngine? = null
+    private var _engine: PomodoroEngine? = null
 
-    fun current(): com.dice.focusflow.feature.pomodoro.engine.PomodoroEngine? = _engine
-
-    fun install(engine: com.dice.focusflow.feature.pomodoro.engine.PomodoroEngine) {
+    fun install(engine: PomodoroEngine) {
         _engine = engine
     }
+    fun current(): PomodoroEngine? = _engine
 }
