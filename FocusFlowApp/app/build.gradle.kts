@@ -66,17 +66,12 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
 
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.6")
-    implementation("androidx.compose.animation:animation")
-
-    implementation("androidx.lifecycle:lifecycle-service:2.8.6")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
-
     // Debugging
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.2")
+
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
 }
+
