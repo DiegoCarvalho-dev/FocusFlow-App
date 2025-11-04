@@ -11,5 +11,5 @@ interface PomodoroEngine {
     fun pause()
     fun resetToFocus()
     fun skipPhase()
-    fun destroy() // Adicionado para gerenciar o ciclo de vida
+    fun destroy()
 }
