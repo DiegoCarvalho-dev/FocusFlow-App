@@ -7,56 +7,37 @@ import android.os.IBinder
 import androidx.core.app.NotificationManagerCompat
 import com.dice.focusflow.feature.pomodoro.EngineLocator
 import com.dice.focusflow.feature.pomodoro.engine.PomodoroEngine
-import com.dice.focusflow.feature.pomodoro.PomodoroPhase
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
 class PomodoroService : Service() {
 
     companion object {
-        const val ACTION_START = "com.dice.focusflow.ACTION_START"
-        const val ACTION_PAUSE = "com.dice.focusflow.ACTION_PAUSE"
-        const val ACTION_RESET = "com.dice.focusflow.ACTION_RESET"
+        const val ACTION_START = "com.dice.focusflow.POMODORO_START"
+        const val ACTION_PAUSE = "com.dice.focusflow.POMODORO_PAUSE"
+        const val ACTION_RESET = "com.dice.focusflow.POMODORO_RESET"
     }
 
-    private val serviceJob = SupervisorJob()
-    private val serviceScope = CoroutineScope(serviceJob + Dispatchers.Main.immediate)
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var streamJob: Job? = null
-
-    private val engine: PomodoroEngine?
-        get() = EngineLocator.current()
+    
+    private var engine: PomodoroEngine? = null
 
     override fun onCreate() {
         super.onCreate()
-
         NotificationHelper.ensureChannel(this)
-
-        val initialState = engine?.state?.value
-
-        val initialNotification = NotificationHelper.buildNotification(
-            context = this,
-            phase = initialState?.phase ?: PomodoroPhase.Focus,
-            remainingSeconds = initialState?.remainingSeconds ?: 25 * 60,
-            isRunning = initialState?.isRunning ?: false
-        )
-
-        startForeground(NotificationHelper.NOTIF_ID, initialNotification)
-        observeEngine()
-    }
-
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
-            ACTION_START -> engine?.start()
-            ACTION_PAUSE -> engine?.pause()
-            ACTION_RESET -> engine?.resetToFocus()
-        }
-        return START_STICKY
     }
 
     @SuppressLint("MissingPermission")
     private fun observeEngine() {
+        val eng = this.engine ?: return
+        
         streamJob?.cancel()
-        val eng = engine ?: return
 
         streamJob = serviceScope.launch {
             eng.state.collectLatest { s ->
@@ -66,15 +47,53 @@ class PomodoroService : Service() {
                     remainingSeconds = s.remainingSeconds,
                     isRunning = s.isRunning
                 )
+
                 NotificationManagerCompat.from(this@PomodoroService)
                     .notify(NotificationHelper.NOTIF_ID, notif)
             }
         }
     }
 
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val currentEngine = EngineLocator.current()
+
+        if (currentEngine == null) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
+        if (this.engine !== currentEngine) {
+            this.engine = currentEngine
+            observeEngine()
+        }
+        
+        if (!isForegroundServiceRunning()) {
+            val initialState = currentEngine.state.value
+            val initialNotification = NotificationHelper.buildNotification(
+                context = this,
+                phase = initialState.phase,
+                remainingSeconds = initialState.remainingSeconds,
+                isRunning = initialState.isRunning
+            )
+            startForeground(NotificationHelper.NOTIF_ID, initialNotification)
+        }
+
+        when (intent?.action) {
+            ACTION_START -> this.engine?.start()
+            ACTION_PAUSE -> this.engine?.pause()
+            ACTION_RESET -> this.engine?.resetToFocus()
+        }
+
+        return START_STICKY
+    }
+    
+    private fun isForegroundServiceRunning(): Boolean {
+        return this.engine != null
+    }
+
     override fun onDestroy() {
         streamJob?.cancel()
-        serviceJob.cancel()
+        serviceScope.cancel()
         super.onDestroy()
     }
 
