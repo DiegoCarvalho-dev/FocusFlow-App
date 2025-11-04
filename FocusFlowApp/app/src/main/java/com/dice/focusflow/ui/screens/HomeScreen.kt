@@ -19,7 +19,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.StrokeCap
@@ -36,29 +39,56 @@ import com.dice.focusflow.feature.pomodoro.PomodoroViewModel
 import com.dice.focusflow.feature.pomodoro.PomodoroViewModelFactory
 import com.dice.focusflow.feature.pomodoro.engine.PomodoroEngineImpl
 import com.dice.focusflow.feature.pomodoro.service.PomodoroService
+import com.dice.focusflow.feature.settings.SettingsViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 
 @Composable
 fun HomeScreen() {
     val context = LocalContext.current
-    val engine = remember { PomodoroEngineImpl(config = PomodoroConfig(), scope = CoroutineScope(Dispatchers.Default)) }
 
-    LaunchedEffect(engine) {
+    val settingsVm: SettingsViewModel = viewModel()
+    val settingsState by settingsVm.uiState.collectAsStateWithLifecycle()
+
+    val engine = remember(
+        settingsState.focusMinutes,
+        settingsState.shortBreakMinutes,
+        settingsState.longBreakMinutes
+    ) {
+        val config = PomodoroConfig(
+            focusMinutes = settingsState.focusMinutes,
+            shortBreakMinutes = settingsState.shortBreakMinutes,
+            longBreakMinutes = settingsState.longBreakMinutes
+        )
+
+        PomodoroEngineImpl(
+            config = config,
+            scope = CoroutineScope(Dispatchers.Default)
+        )
+    }
+
+    LaunchedEffect(Unit) {
         EngineLocator.install(engine)
     }
 
     val vm: PomodoroViewModel = viewModel(
+        key = "pomodoro-${settingsState.focusMinutes}-${settingsState.shortBreakMinutes}-${settingsState.longBreakMinutes}",
         factory = PomodoroViewModelFactory(engine = engine)
     )
 
     val state by vm.state.collectAsStateWithLifecycle()
 
+    val totalSeconds = when (state.phase) {
+        PomodoroPhase.Focus -> settingsState.focusMinutes * 60
+        PomodoroPhase.ShortBreak -> settingsState.shortBreakMinutes * 60
+        PomodoroPhase.LongBreak -> settingsState.longBreakMinutes * 60
+    }.coerceAtLeast(1)
+
+    val elapsed = (totalSeconds - state.remainingSeconds).coerceIn(0, totalSeconds)
+    val targetProgress = (elapsed.toFloat() / totalSeconds.toFloat()).coerceIn(0f, 1f)
+
     val progress by animateFloatAsState(
-        targetValue = progressOf(
-            remainingSeconds = state.remainingSeconds,
-            phase = state.phase
-        ),
+        targetValue = targetProgress,
         animationSpec = spring(dampingRatio = 0.9f, stiffness = 200f),
         label = "timerProgress"
     )
@@ -158,7 +188,7 @@ fun HomeScreen() {
         }
 
         OutlinedButton(
-            onClick = { 
+            onClick = {
                 vm.resetToFocus()
                 context.stopService(Intent(context, PomodoroService::class.java))
             },
@@ -180,18 +210,6 @@ private fun phaseTitle(phase: PomodoroPhase): String = when (phase) {
     PomodoroPhase.Focus -> "Foco"
     PomodoroPhase.ShortBreak -> "Pausa curta"
     PomodoroPhase.LongBreak -> "Pausa longa"
-}
-
-private fun phaseTotalSeconds(phase: PomodoroPhase): Int = when (phase) {
-    PomodoroPhase.Focus -> 25 * 60
-    PomodoroPhase.ShortBreak -> 5 * 60
-    PomodoroPhase.LongBreak -> 15 * 60
-}
-
-private fun progressOf(remainingSeconds: Int, phase: PomodoroPhase): Float {
-    val total = phaseTotalSeconds(phase).coerceAtLeast(1)
-    val elapsed = (total - remainingSeconds).coerceIn(0, total)
-    return (elapsed.toFloat() / total).coerceIn(0f, 1f)
 }
 
 private fun formatMMSS(totalSeconds: Int): String {
