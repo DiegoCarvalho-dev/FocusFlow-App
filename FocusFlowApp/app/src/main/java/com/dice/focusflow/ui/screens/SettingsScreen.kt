@@ -147,6 +147,19 @@ private fun DurationSliderRow(
                 activeTrackColor = MaterialTheme.colorScheme.primary
             )
         )
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 2.dp),
+            horizontalArrangement = Arrangement.Start
+        ) {
+            Text(
+                text = "${range.start.toInt()} min",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
