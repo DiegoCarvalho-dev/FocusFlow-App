@@ -44,60 +44,71 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 
 @Composable
-fun HomeScreen() {
+fun HomeScreen(
+    settingsVm: SettingsViewModel
+) {
     val context = LocalContext.current
 
-    val settingsVm: SettingsViewModel = viewModel()
     val settingsState by settingsVm.uiState.collectAsStateWithLifecycle()
 
-    val engine = remember(
+    val engine = remember {
+        val existing = EngineLocator.current()
+        if (existing != null) {
+            existing
+        } else {
+            PomodoroEngineImpl(
+                config = PomodoroConfig(
+                    focusMinutes = settingsState.focusMinutes,
+                    shortBreakMinutes = settingsState.shortBreakMinutes,
+                    longBreakMinutes = settingsState.longBreakMinutes
+                ),
+                scope = CoroutineScope(Dispatchers.Default)
+            ).also { created ->
+                EngineLocator.install(created)
+            }
+        }
+    }
+
+    LaunchedEffect(
         settingsState.focusMinutes,
         settingsState.shortBreakMinutes,
         settingsState.longBreakMinutes
     ) {
-        val config = PomodoroConfig(
-            focusMinutes = settingsState.focusMinutes,
-            shortBreakMinutes = settingsState.shortBreakMinutes,
-            longBreakMinutes = settingsState.longBreakMinutes
-        )
-
-        PomodoroEngineImpl(
-            config = config,
-            scope = CoroutineScope(Dispatchers.Default)
+        engine.setConfig(
+            PomodoroConfig(
+                focusMinutes = settingsState.focusMinutes,
+                shortBreakMinutes = settingsState.shortBreakMinutes,
+                longBreakMinutes = settingsState.longBreakMinutes
+            )
         )
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(engine) {
         EngineLocator.install(engine)
     }
 
     val vm: PomodoroViewModel = viewModel(
-        key = "pomodoro-${settingsState.focusMinutes}-${settingsState.shortBreakMinutes}-${settingsState.longBreakMinutes}",
         factory = PomodoroViewModelFactory(engine = engine)
     )
-
     val state by vm.state.collectAsStateWithLifecycle()
 
-    val totalSeconds = when (state.phase) {
+    val totalSecondsForPhase = when (state.phase) {
         PomodoroPhase.Focus -> settingsState.focusMinutes * 60
         PomodoroPhase.ShortBreak -> settingsState.shortBreakMinutes * 60
         PomodoroPhase.LongBreak -> settingsState.longBreakMinutes * 60
     }.coerceAtLeast(1)
 
-    val elapsed = (totalSeconds - state.remainingSeconds).coerceIn(0, totalSeconds)
-    val targetProgress = (elapsed.toFloat() / totalSeconds.toFloat()).coerceIn(0f, 1f)
+    val elapsedSeconds =
+        (totalSecondsForPhase - state.remainingSeconds).coerceIn(0, totalSecondsForPhase)
+
+    val targetProgress = (elapsedSeconds.toFloat() / totalSecondsForPhase.toFloat())
+        .coerceIn(0f, 1f)
 
     val progress by animateFloatAsState(
         targetValue = targetProgress,
         animationSpec = spring(dampingRatio = 0.9f, stiffness = 200f),
         label = "timerProgress"
     )
-
-    val phaseColor = when (state.phase) {
-        PomodoroPhase.Focus -> MaterialTheme.colorScheme.primary
-        PomodoroPhase.ShortBreak -> MaterialTheme.colorScheme.tertiary
-        PomodoroPhase.LongBreak -> MaterialTheme.colorScheme.secondary
-    }
 
     Column(
         modifier = Modifier
@@ -124,6 +135,12 @@ fun HomeScreen() {
                 .padding(top = 8.dp),
             contentAlignment = Alignment.Center
         ) {
+            val phaseColor = when (state.phase) {
+                PomodoroPhase.Focus -> MaterialTheme.colorScheme.primary
+                PomodoroPhase.ShortBreak -> MaterialTheme.colorScheme.tertiary
+                PomodoroPhase.LongBreak -> MaterialTheme.colorScheme.secondary
+            }
+
             CircularProgressIndicator(
                 progress = { progress },
                 strokeCap = StrokeCap.Round,
@@ -151,7 +168,11 @@ fun HomeScreen() {
             label = { Text(phaseTitle(state.phase)) },
             colors = AssistChipDefaults.assistChipColors(
                 labelColor = MaterialTheme.colorScheme.onPrimary,
-                containerColor = phaseColor
+                containerColor = when (state.phase) {
+                    PomodoroPhase.Focus -> MaterialTheme.colorScheme.primary
+                    PomodoroPhase.ShortBreak -> MaterialTheme.colorScheme.tertiary
+                    PomodoroPhase.LongBreak -> MaterialTheme.colorScheme.secondary
+                }
             )
         )
 
@@ -160,12 +181,16 @@ fun HomeScreen() {
         Button(
             onClick = {
                 val intent = Intent(context, PomodoroService::class.java)
+
                 if (state.isRunning) {
                     vm.pause()
+                    intent.action = PomodoroService.ACTION_PAUSE
                 } else {
                     vm.start()
-                    context.startService(intent)
+                    intent.action = PomodoroService.ACTION_START
                 }
+
+                context.startService(intent)
             },
             modifier = Modifier
                 .fillMaxWidth()
