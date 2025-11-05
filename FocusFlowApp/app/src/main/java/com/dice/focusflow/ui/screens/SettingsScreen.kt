@@ -23,14 +23,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.dice.focusflow.feature.settings.AppThemeMode
 import com.dice.focusflow.feature.settings.SettingsUiState
 import com.dice.focusflow.feature.settings.SettingsViewModel
+import com.dice.focusflow.feature.settings.ThemeMode
 
 @Composable
 fun SettingsScreen(
-    vm: SettingsViewModel = viewModel()
+    vm: SettingsViewModel
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
 
@@ -98,7 +97,7 @@ private fun DurationSection(
         DurationSliderRow(
             label = "Foco",
             minutes = state.focusMinutes,
-            range = 10f..60f,
+            range = 1f..60f,
             onChange = onFocusChange
         )
 
@@ -112,7 +111,7 @@ private fun DurationSection(
         DurationSliderRow(
             label = "Pausa longa",
             minutes = state.longBreakMinutes,
-            range = 5f..40f,
+            range = 1f..40f,
             onChange = onLongBreakChange
         )
     }
@@ -153,8 +152,8 @@ private fun DurationSliderRow(
 
 @Composable
 private fun ThemeSection(
-    themeMode: AppThemeMode,
-    onThemeChange: (AppThemeMode) -> Unit
+    themeMode: ThemeMode,
+    onThemeChange: (ThemeMode) -> Unit
 ) {
     Column(
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -176,18 +175,18 @@ private fun ThemeSection(
         ) {
             ThemeChip(
                 label = "Sistema",
-                selected = themeMode == AppThemeMode.SYSTEM,
-                onClick = { onThemeChange(AppThemeMode.SYSTEM) }
+                selected = themeMode == ThemeMode.SYSTEM,
+                onClick = { onThemeChange(ThemeMode.SYSTEM) }
             )
             ThemeChip(
                 label = "Claro",
-                selected = themeMode == AppThemeMode.LIGHT,
-                onClick = { onThemeChange(AppThemeMode.LIGHT) }
+                selected = themeMode == ThemeMode.LIGHT,
+                onClick = { onThemeChange(ThemeMode.LIGHT) }
             )
             ThemeChip(
                 label = "Escuro",
-                selected = themeMode == AppThemeMode.DARK,
-                onClick = { onThemeChange(AppThemeMode.DARK) }
+                selected = themeMode == ThemeMode.DARK,
+                onClick = { onThemeChange(ThemeMode.DARK) }
             )
         }
     }

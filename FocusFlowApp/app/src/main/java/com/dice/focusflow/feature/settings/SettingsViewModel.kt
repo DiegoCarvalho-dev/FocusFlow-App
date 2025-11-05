@@ -2,81 +2,46 @@ package com.dice.focusflow.feature.settings
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
-
-data class SettingsUiState(
-    val focusMinutes: Int = 25,
-    val shortBreakMinutes: Int = 5,
-    val longBreakMinutes: Int = 15,
-    val soundEnabled: Boolean = true,
-    val vibrationEnabled: Boolean = true,
-    val themeMode: AppThemeMode = AppThemeMode.SYSTEM,
-    val isLoading: Boolean = true
-)
+import kotlinx.coroutines.flow.asStateFlow
 
 class SettingsViewModel(
-    app: Application
-) : AndroidViewModel(app) {
+    application: Application
+) : AndroidViewModel(application) {
 
-    private val appContext = app.applicationContext
+    private val _uiState = MutableStateFlow(SettingsUiState())
+    val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
-    val uiState: StateFlow<SettingsUiState> =
-        UserSettingsStore.observe(appContext)
-            .map { settings ->
-                SettingsUiState(
-                    focusMinutes = settings.focusMinutes,
-                    shortBreakMinutes = settings.shortBreakMinutes,
-                    longBreakMinutes = settings.longBreakMinutes,
-                    soundEnabled = settings.soundEnabled,
-                    vibrationEnabled = settings.vibrationEnabled,
-                    themeMode = settings.themeMode,
-                    isLoading = false
-                )
-            }
-            .stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5_000),
-                initialValue = SettingsUiState()
-            )
-
-    fun updateFocusMinutes(min: Int) {
-        viewModelScope.launch {
-            UserSettingsStore.setFocusMinutes(appContext, min)
-        }
+    fun updateFocusMinutes(value: Int) {
+        val safe = value.coerceIn(1, 120)
+        updateState { it.copy(focusMinutes = safe) }
     }
 
-    fun updateShortBreakMinutes(min: Int) {
-        viewModelScope.launch {
-            UserSettingsStore.setShortBreakMinutes(appContext, min)
-        }
+    fun updateShortBreakMinutes(value: Int) {
+        val safe = value.coerceIn(1, 60)
+        updateState { it.copy(shortBreakMinutes = safe) }
     }
 
-    fun updateLongBreakMinutes(min: Int) {
-        viewModelScope.launch {
-            UserSettingsStore.setLongBreakMinutes(appContext, min)
-        }
+    fun updateLongBreakMinutes(value: Int) {
+        val safe = value.coerceIn(1, 60)
+        updateState { it.copy(longBreakMinutes = safe) }
+    }
+
+    fun updateThemeMode(mode: ThemeMode) {
+        updateState { it.copy(themeMode = mode) }
     }
 
     fun updateSoundEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            UserSettingsStore.setSoundEnabled(appContext, enabled)
-        }
+        updateState { it.copy(soundEnabled = enabled) }
     }
 
     fun updateVibrationEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            UserSettingsStore.setVibrationEnabled(appContext, enabled)
-        }
+        updateState { it.copy(vibrationEnabled = enabled) }
     }
 
-    fun updateThemeMode(mode: AppThemeMode) {
-        viewModelScope.launch {
-            UserSettingsStore.setThemeMode(appContext, mode)
-        }
+    private fun updateState(block: (SettingsUiState) -> SettingsUiState) {
+        _uiState.value = block(_uiState.value)
+
     }
 }
