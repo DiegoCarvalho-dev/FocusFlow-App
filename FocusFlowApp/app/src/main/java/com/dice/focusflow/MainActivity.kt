@@ -3,17 +3,21 @@ package com.dice.focusflow
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.rememberNavController
 import com.dice.focusflow.feature.settings.SettingsViewModel
+import com.dice.focusflow.feature.settings.ThemeMode
 import com.dice.focusflow.ui.components.BottomBar
 import com.dice.focusflow.ui.navigation.AppNavGraph
 import com.dice.focusflow.ui.theme.FocusFlowTheme
@@ -33,8 +37,15 @@ fun FocusFlowApp() {
     val navController = rememberNavController()
 
     val settingsVm: SettingsViewModel = viewModel()
+    val settingsState by settingsVm.uiState.collectAsStateWithLifecycle()
 
-    FocusFlowTheme {
+    val darkTheme = when (settingsState.themeMode) {
+        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK -> true
+    }
+
+    FocusFlowTheme(darkTheme = darkTheme) {
         Scaffold(
             topBar = {
                 CenterAlignedTopAppBar(
