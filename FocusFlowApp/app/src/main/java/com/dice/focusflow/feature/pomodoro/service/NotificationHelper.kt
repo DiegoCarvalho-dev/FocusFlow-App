@@ -24,9 +24,11 @@ object NotificationHelper {
                 CHANNEL_ID,
                 "FocusFlow Timer",
                 NotificationManager.IMPORTANCE_LOW
-            )
-            channel.description = "Exibe o timer Pomodoro em primeiro plano"
-            channel.setSound(null, null)
+            ).apply {
+                description = "Exibe o timer Pomodoro em primeiro plano"
+                setSound(null, null)
+            }
+
             NotificationManagerCompat.from(context).createNotificationChannel(channel)
         }
     }
@@ -40,20 +42,39 @@ object NotificationHelper {
         val title = phaseTitle(phase)
         val formattedTime = formatMMSS(remainingSeconds)
 
-        val openAppIntent = PendingIntent.getActivity(
+        val openMainIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+
+        val openAppPendingIntent = PendingIntent.getActivity(
             context,
             0,
-            Intent(context, MainActivity::class.java),
+            openMainIntent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
         val playPauseAction = if (isRunning) {
-            createAction(context, PomodoroService.ACTION_PAUSE, "Pausar", R.drawable.ic_stat_timer)
+            createAction(
+                context = context,
+                action = PomodoroService.ACTION_PAUSE,
+                title = "Pausar",
+                icon = R.drawable.ic_stat_timer
+            )
         } else {
-            createAction(context, PomodoroService.ACTION_START, "Iniciar", R.drawable.ic_stat_timer)
+            createAction(
+                context = context,
+                action = PomodoroService.ACTION_START,
+                title = "Iniciar",
+                icon = R.drawable.ic_stat_timer
+            )
         }
 
-        val resetAction = createAction(context, PomodoroService.ACTION_RESET, "Resetar", R.drawable.ic_stat_timer)
+        val resetAction = createAction(
+            context = context,
+            action = PomodoroService.ACTION_RESET,
+            title = "Resetar",
+            icon = R.drawable.ic_stat_timer
+        )
 
         return NotificationCompat.Builder(context, CHANNEL_ID)
             .setContentTitle(title)
@@ -63,20 +84,29 @@ object NotificationHelper {
             .setShowWhen(false)
             .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .setContentIntent(openAppIntent)
+            .setContentIntent(openAppPendingIntent)
             .addAction(playPauseAction)
             .addAction(resetAction)
             .build()
     }
 
-    private fun createAction(context: Context, action: String, title: String, icon: Int): NotificationCompat.Action {
-        val intent = Intent(context, PomodoroService::class.java).apply { this.action = action }
+    private fun createAction(
+        context: Context,
+        action: String,
+        title: String,
+        icon: Int
+    ): NotificationCompat.Action {
+        val intent = Intent(context, PomodoroService::class.java).apply {
+            this.action = action
+        }
+
         val pendingIntent = PendingIntent.getService(
-            context, 
-            action.hashCode(), 
-            intent, 
+            context,
+            action.hashCode(),
+            intent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
+
         return NotificationCompat.Action(icon, title, pendingIntent)
     }
 
