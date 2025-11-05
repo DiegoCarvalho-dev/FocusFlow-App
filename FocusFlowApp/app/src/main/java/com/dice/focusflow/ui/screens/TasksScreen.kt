@@ -34,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -47,8 +48,10 @@ fun TasksScreen(
     val tasks by vm.tasks.collectAsStateWithLifecycle()
     var newTaskTitle by remember { mutableStateOf("") }
 
+    val trimmedTitle = newTaskTitle.trim()
     val canAddMore = tasks.size < 10
-    val canAddNow = newTaskTitle.isNotBlank() && canAddMore
+    val isDuplicateTitle = tasks.any { it.title.equals(trimmedTitle, ignoreCase = true) }
+    val canAddNow = trimmedTitle.isNotEmpty() && canAddMore && !isDuplicateTitle
 
     Column(
         modifier = Modifier
@@ -64,6 +67,12 @@ fun TasksScreen(
         )
 
         Text(
+            text = "Organize até 10 tarefas para acompanhar seu dia.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Text(
             text = "${tasks.size} / 10 tarefas",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -76,15 +85,17 @@ fun TasksScreen(
             label = { Text("Nova tarefa") },
             singleLine = true,
             supportingText = {
-                if (!canAddMore) {
-                    Text("Limite de 10 tarefas atingido.")
+                when {
+                    !canAddMore -> Text("Limite de 10 tarefas atingido.")
+                    isDuplicateTitle && trimmedTitle.isNotEmpty() ->
+                        Text("Você já tem uma tarefa com esse nome.")
                 }
             },
             trailingIcon = {
                 IconButton(
                     onClick = {
                         if (canAddNow) {
-                            vm.addTask(newTaskTitle.trim())
+                            vm.addTask(trimmedTitle)
                             newTaskTitle = ""
                         }
                     },
@@ -169,6 +180,8 @@ private fun TaskItem(
                 text = task.title,
                 style = MaterialTheme.typography.bodyLarge,
                 textDecoration = if (task.isDone) TextDecoration.LineThrough else TextDecoration.None,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
 
