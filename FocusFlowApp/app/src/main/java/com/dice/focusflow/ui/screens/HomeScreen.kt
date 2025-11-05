@@ -113,8 +113,7 @@ fun HomeScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 24.dp)
-            .padding(top = 24.dp, bottom = 16.dp),
+            .padding(horizontal = 24.dp, vertical = 24.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp, Alignment.Top),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -125,9 +124,17 @@ fun HomeScreen(
         ) { phase ->
             Text(
                 text = phaseTitle(phase),
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+                style = MaterialTheme.typography.headlineSmall.copy(
+                    fontWeight = FontWeight.Bold
+                )
             )
         }
+
+        Text(
+            text = if (state.isRunning) "Ciclo em andamento" else "Timer pausado",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
 
         Box(
             modifier = Modifier
@@ -204,7 +211,11 @@ fun HomeScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = if (running) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = null
+                        contentDescription = if (running) {
+                            "Pausar timer"
+                        } else {
+                            "Iniciar timer"
+                        }
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(if (running) "Pausar" else "Iniciar")
@@ -226,7 +237,11 @@ fun HomeScreen(
 
         AssistChip(
             onClick = { /* no-op */ },
-            label = { Text(if (state.isRunning) "Rodando" else "Pausado") }
+            label = {
+                Text(
+                    if (state.isRunning) "Rodando" else "Pausado"
+                )
+            }
         )
     }
 }

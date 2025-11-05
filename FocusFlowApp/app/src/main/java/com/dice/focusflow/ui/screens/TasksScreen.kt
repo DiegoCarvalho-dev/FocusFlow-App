@@ -32,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -46,6 +47,9 @@ fun TasksScreen(
     val tasks by vm.tasks.collectAsStateWithLifecycle()
     var newTaskTitle by remember { mutableStateOf("") }
 
+    val canAddMore = tasks.size < 10
+    val canAddNow = newTaskTitle.isNotBlank() && canAddMore
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -54,7 +58,9 @@ fun TasksScreen(
     ) {
         Text(
             text = "Tarefas do dia",
-            style = MaterialTheme.typography.titleLarge
+            style = MaterialTheme.typography.headlineSmall.copy(
+                fontWeight = FontWeight.Bold
+            )
         )
 
         Text(
@@ -69,11 +75,21 @@ fun TasksScreen(
             modifier = Modifier.fillMaxWidth(),
             label = { Text("Nova tarefa") },
             singleLine = true,
+            supportingText = {
+                if (!canAddMore) {
+                    Text("Limite de 10 tarefas atingido.")
+                }
+            },
             trailingIcon = {
-                IconButton(onClick = {
-                    vm.addTask(newTaskTitle)
-                    newTaskTitle = ""
-                }) {
+                IconButton(
+                    onClick = {
+                        if (canAddNow) {
+                            vm.addTask(newTaskTitle.trim())
+                            newTaskTitle = ""
+                        }
+                    },
+                    enabled = canAddNow
+                ) {
                     Icon(
                         imageVector = Icons.Default.NoteAdd,
                         contentDescription = "Adicionar tarefa"
@@ -91,7 +107,8 @@ fun TasksScreen(
             ) {
                 Text(
                     text = "Nenhuma tarefa por enquanto.\nAdicione algo para focar hoje 😊",
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         } else {

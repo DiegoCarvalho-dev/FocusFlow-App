@@ -68,7 +68,8 @@ fun SummaryScreen(
 
         Text(
             text = "Veja quantos ciclos de foco você concluiu desde o último reset e o tempo estimado de foco.",
-            style = MaterialTheme.typography.bodySmall
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
         Divider()
@@ -109,7 +110,8 @@ fun SummaryScreen(
             )
             Text(
                 text = "Isso não apaga o histórico real do Pomodoro, só reinicia o contador mostrado aqui.",
-                style = MaterialTheme.typography.bodySmall
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             Spacer(Modifier.height(8.dp))
