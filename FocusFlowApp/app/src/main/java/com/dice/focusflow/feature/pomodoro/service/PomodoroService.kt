@@ -6,7 +6,9 @@ import android.content.Intent
 import android.os.IBinder
 import androidx.core.app.NotificationManagerCompat
 import com.dice.focusflow.feature.pomodoro.EngineLocator
+import com.dice.focusflow.feature.pomodoro.PomodoroPhase
 import com.dice.focusflow.feature.pomodoro.engine.PomodoroEngine
+import com.dice.focusflow.feature.summary.DailySummaryRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -25,7 +27,7 @@ class PomodoroService : Service() {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var streamJob: Job? = null
-    
+
     private var engine: PomodoroEngine? = null
 
     override fun onCreate() {
@@ -36,10 +38,16 @@ class PomodoroService : Service() {
     @SuppressLint("MissingPermission")
     private fun observeEngine() {
         val eng = this.engine ?: return
-        
+
+        val summaryRepo = DailySummaryRepository(applicationContext)
+
         streamJob?.cancel()
 
         streamJob = serviceScope.launch {
+            var lastPhase: PomodoroPhase? = null
+            var lastRemaining: Int? = null
+            var lastIsRunning: Boolean = false
+
             eng.state.collectLatest { s ->
                 val notif = NotificationHelper.buildNotification(
                     context = this@PomodoroService,
@@ -50,6 +58,47 @@ class PomodoroService : Service() {
 
                 NotificationManagerCompat.from(this@PomodoroService)
                     .notify(NotificationHelper.NOTIF_ID, notif)
+
+                val previousPhase = lastPhase
+                val previousRemaining = lastRemaining
+                val previousRunning = lastIsRunning
+
+                if (
+                    s.phase == PomodoroPhase.Focus &&
+                    s.isRunning &&
+                    previousPhase == PomodoroPhase.Focus &&
+                    previousRunning
+                ) {
+                    if (previousRemaining != null) {
+                        val delta = (previousRemaining - s.remainingSeconds).coerceAtLeast(0)
+                        if (delta > 0) {
+                            launch {
+                                summaryRepo.addFocusProgress(
+                                    additionalSeconds = delta.toLong(),
+                                    additionalCompletedSessions = 0
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (
+                    previousPhase == PomodoroPhase.Focus &&
+                    (s.phase == PomodoroPhase.ShortBreak || s.phase == PomodoroPhase.LongBreak)
+                ) {
+                    val missingSeconds = (previousRemaining ?: 0).coerceAtLeast(0)
+
+                    launch {
+                        summaryRepo.addFocusProgress(
+                            additionalSeconds = missingSeconds.toLong(),
+                            additionalCompletedSessions = 1
+                        )
+                    }
+                }
+
+                lastPhase = s.phase
+                lastRemaining = s.remainingSeconds
+                lastIsRunning = s.isRunning
             }
         }
     }
@@ -66,7 +115,7 @@ class PomodoroService : Service() {
             this.engine = currentEngine
             observeEngine()
         }
-        
+
         if (!isForegroundServiceRunning()) {
             val initialState = currentEngine.state.value
             val initialNotification = NotificationHelper.buildNotification(
@@ -86,7 +135,7 @@ class PomodoroService : Service() {
 
         return START_STICKY
     }
-    
+
     private fun isForegroundServiceRunning(): Boolean {
         return this.engine != null
     }

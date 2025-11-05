@@ -19,40 +19,41 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.dice.focusflow.feature.pomodoro.EngineLocator
 import com.dice.focusflow.feature.settings.SettingsViewModel
+import com.dice.focusflow.feature.summary.DailySummary
+import com.dice.focusflow.feature.summary.DailySummaryRepository
+import kotlinx.coroutines.launch
 
 @Composable
 fun SummaryScreen(
     settingsVm: SettingsViewModel
 ) {
-    val settingsState by settingsVm.uiState.collectAsStateWithLifecycle()
-    val focusMinutes = settingsState.focusMinutes
+    val context = LocalContext.current
+    val summaryRepo = remember { DailySummaryRepository(context.applicationContext) }
+    val scope = rememberCoroutineScope()
 
-    val engine = EngineLocator.current()
+    val summaryState by summaryRepo.summaryFlow.collectAsStateWithLifecycle(
+        initialValue = DailySummary(
+            date = "",
+            focusSeconds = 0L,
+            completedFocusSessions = 0
+        )
+    )
+
+    val focusCyclesToday: Int =
+        summaryState.completedFocusSessions.coerceAtLeast(0)
+
+    val estimatedMinutes: Int =
+        (summaryState.focusSeconds / 60L).toInt().coerceAtLeast(0)
 
     var showResetDialog by remember { mutableStateOf(false) }
-    var offset by rememberSaveable { mutableStateOf(0) }
-
-    val focusCyclesToday: Int
-    val estimatedMinutes: Int
-
-    if (engine != null) {
-        val engineState by engine.state.collectAsStateWithLifecycle()
-        val rawCycles = engineState.completedPomodoros
-        val displayCycles = (rawCycles - offset).coerceAtLeast(0)
-        focusCyclesToday = displayCycles
-        estimatedMinutes = displayCycles * focusMinutes
-    } else {
-        focusCyclesToday = 0
-        estimatedMinutes = 0
-    }
 
     Column(
         modifier = Modifier
@@ -176,11 +177,8 @@ fun SummaryScreen(
                 },
                 confirmButton = {
                     TextButton(onClick = {
-                        val currentEngine = EngineLocator.current()
-                        offset = if (currentEngine != null) {
-                            currentEngine.state.value.completedPomodoros
-                        } else {
-                            0
+                        scope.launch {
+                            summaryRepo.resetToday()
                         }
                         showResetDialog = false
                     }) {
