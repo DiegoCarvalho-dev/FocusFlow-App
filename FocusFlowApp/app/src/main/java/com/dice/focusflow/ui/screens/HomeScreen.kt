@@ -27,6 +27,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -69,6 +71,7 @@ fun HomeScreen(
         }
     }
 
+
     LaunchedEffect(
         settingsState.focusMinutes,
         settingsState.shortBreakMinutes,
@@ -92,6 +95,8 @@ fun HomeScreen(
     )
     val state by vm.state.collectAsStateWithLifecycle()
 
+    val phaseLabel = phaseTitle(state.phase)
+
     val totalSecondsForPhase = when (state.phase) {
         PomodoroPhase.Focus -> settingsState.focusMinutes * 60
         PomodoroPhase.ShortBreak -> settingsState.shortBreakMinutes * 60
@@ -113,33 +118,39 @@ fun HomeScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 24.dp, vertical = 24.dp),
+            .padding(horizontal = 24.dp)
+            .padding(top = 24.dp, bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp, Alignment.Top),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        AnimatedContent(
-            targetState = state.phase,
-            transitionSpec = { fadeIn() togetherWith fadeOut() },
-            label = "phaseTitle"
-        ) { phase ->
-            Text(
-                text = phaseTitle(phase),
-                style = MaterialTheme.typography.headlineSmall.copy(
-                    fontWeight = FontWeight.Bold
-                )
-            )
-        }
-
         Text(
             text = if (state.isRunning) "Ciclo em andamento" else "Timer pausado",
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .fillMaxWidth()
+                .wrapContentWidth(Alignment.CenterHorizontally)
         )
+
+        AnimatedContent(
+            targetState = phaseLabel,
+            transitionSpec = { fadeIn() togetherWith fadeOut() },
+            label = "phaseTitle"
+        ) { label ->
+            Text(
+                text = label,
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+            )
+        }
 
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 8.dp),
+                .padding(top = 8.dp)
+                .semantics {
+                    contentDescription =
+                        "$phaseLabel, tempo restante ${formatMMSS(state.remainingSeconds)}"
+                },
             contentAlignment = Alignment.Center
         ) {
             val phaseColor = when (state.phase) {
@@ -172,7 +183,7 @@ fun HomeScreen(
 
         AssistChip(
             onClick = { /* no-op */ },
-            label = { Text(phaseTitle(state.phase)) },
+            label = { Text(phaseLabel) },
             colors = AssistChipDefaults.assistChipColors(
                 labelColor = MaterialTheme.colorScheme.onPrimary,
                 containerColor = when (state.phase) {
@@ -211,11 +222,7 @@ fun HomeScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = if (running) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (running) {
-                            "Pausar timer"
-                        } else {
-                            "Iniciar timer"
-                        }
+                        contentDescription = if (running) "Pausar timer" else "Iniciar timer"
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(if (running) "Pausar" else "Iniciar")
@@ -237,11 +244,7 @@ fun HomeScreen(
 
         AssistChip(
             onClick = { /* no-op */ },
-            label = {
-                Text(
-                    if (state.isRunning) "Rodando" else "Pausado"
-                )
-            }
+            label = { Text(if (state.isRunning) "Rodando" else "Pausado") }
         )
     }
 }
