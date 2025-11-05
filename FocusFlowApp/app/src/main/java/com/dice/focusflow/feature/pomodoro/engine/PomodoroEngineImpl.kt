@@ -24,8 +24,17 @@ class PomodoroEngineImpl(
     private var tickerJob: Job? = null
 
     override fun setConfig(newConfig: PomodoroConfig) {
+        if (newConfig == config) return
+
         config = newConfig
-        resetToFocus()
+
+        val current = _state.value
+        stopTicker()
+        _state.value = current.copy(
+            phase = PomodoroPhase.Focus,
+            remainingSeconds = newConfig.focusMinutes * 60,
+            isRunning = false
+        )
     }
 
     override fun start() {
@@ -87,8 +96,11 @@ class PomodoroEngineImpl(
             PomodoroPhase.Focus -> {
                 val completed = if (skipped) current.completedPomodoros else current.completedPomodoros + 1
                 val nextPhase =
-                    if (completed > 0 && completed % config.cyclesUntilLongBreak == 0) PomodoroPhase.LongBreak
-                    else PomodoroPhase.ShortBreak
+                    if (completed > 0 && completed % config.cyclesUntilLongBreak == 0) {
+                        PomodoroPhase.LongBreak
+                    } else {
+                        PomodoroPhase.ShortBreak
+                    }
 
                 _state.value = current.copy(
                     phase = nextPhase,
@@ -98,7 +110,8 @@ class PomodoroEngineImpl(
                 )
             }
 
-            PomodoroPhase.ShortBreak, PomodoroPhase.LongBreak -> {
+            PomodoroPhase.ShortBreak,
+            PomodoroPhase.LongBreak -> {
                 _state.value = current.copy(
                     phase = PomodoroPhase.Focus,
                     remainingSeconds = defaultSecondsFor(PomodoroPhase.Focus),

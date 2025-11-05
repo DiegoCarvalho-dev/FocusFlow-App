@@ -10,9 +10,19 @@ class PomodoroViewModel(
 
     val state: StateFlow<PomodoroState> = engine.state
 
-    fun setConfig(config: PomodoroConfig) = engine.setConfig(config)
+    fun setConfig(newConfig: PomodoroConfig) {
+        engine.setConfig(newConfig)
+    }
+
     fun start() = engine.start()
+
     fun pause() = engine.pause()
+
     fun resetToFocus() = engine.resetToFocus()
+
     fun skipPhase() = engine.skipPhase()
+
+    override fun onCleared() {
+        super.onCleared()
+    }
 }
