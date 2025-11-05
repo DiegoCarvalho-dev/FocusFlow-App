@@ -2,10 +2,12 @@ package com.dice.focusflow.ui.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.dice.focusflow.feature.settings.SettingsViewModel
+import com.dice.focusflow.feature.tasks.TasksViewModel
 import com.dice.focusflow.ui.screens.HomeScreen
 import com.dice.focusflow.ui.screens.SettingsScreen
 import com.dice.focusflow.ui.screens.SummaryScreen
@@ -24,6 +26,8 @@ fun AppNavGraph(
     settingsVm: SettingsViewModel,
     modifier: Modifier = Modifier
 ) {
+    val tasksVm: TasksViewModel = viewModel()
+
     NavHost(
         navController = navController,
         startDestination = AppRoute.Home.route,
@@ -33,7 +37,7 @@ fun AppNavGraph(
             HomeScreen(settingsVm = settingsVm)
         }
         composable(AppRoute.Tasks.route) {
-            TasksScreen()
+            TasksScreen(vm = tasksVm)
         }
         composable(AppRoute.Summary.route) {
             SummaryScreen(settingsVm = settingsVm)
