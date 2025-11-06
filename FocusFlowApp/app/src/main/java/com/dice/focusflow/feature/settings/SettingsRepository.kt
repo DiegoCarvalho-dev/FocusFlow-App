@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -19,15 +20,25 @@ class SettingsRepository(private val context: Context) {
         private val KEY_LONG_BREAK = intPreferencesKey("long_break_minutes")
         private val KEY_SOUND_ENABLED = booleanPreferencesKey("sound_enabled")
         private val KEY_VIBRATION_ENABLED = booleanPreferencesKey("vibration_enabled")
+
+        private val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
     }
 
     val settingsFlow: Flow<SettingsUiState> = context.dataStore.data.map { prefs ->
+        val themeString = prefs[KEY_THEME_MODE]
+        val themeMode = if (themeString != null) {
+            runCatching { ThemeMode.valueOf(themeString) }.getOrDefault(ThemeMode.SYSTEM)
+        } else {
+            ThemeMode.SYSTEM
+        }
+
         SettingsUiState(
             focusMinutes = prefs[KEY_FOCUS_MINUTES] ?: 25,
             shortBreakMinutes = prefs[KEY_SHORT_BREAK] ?: 5,
             longBreakMinutes = prefs[KEY_LONG_BREAK] ?: 15,
             soundEnabled = prefs[KEY_SOUND_ENABLED] ?: true,
-            vibrationEnabled = prefs[KEY_VIBRATION_ENABLED] ?: true
+            vibrationEnabled = prefs[KEY_VIBRATION_ENABLED] ?: true,
+            themeMode = themeMode
         )
     }
 
@@ -38,6 +49,8 @@ class SettingsRepository(private val context: Context) {
             prefs[KEY_LONG_BREAK] = state.longBreakMinutes
             prefs[KEY_SOUND_ENABLED] = state.soundEnabled
             prefs[KEY_VIBRATION_ENABLED] = state.vibrationEnabled
+
+            prefs[KEY_THEME_MODE] = state.themeMode.name
         }
     }
 }
